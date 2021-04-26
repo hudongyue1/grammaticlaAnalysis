@@ -23,6 +23,14 @@ public:
         this.type = type;
         this.id = id; 
     }
+
+    bool operator < (const Symbol& otherSymbol) {
+        return this.id < otherSymbol.id;
+    }
+
+    bool operator == (const Symbol& otherSymbol) {
+        return this.id == otherSymbol.id;
+    }
 };
 
 // 定义两个特殊符号
