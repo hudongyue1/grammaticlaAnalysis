@@ -44,6 +44,14 @@ public:
 	bool operator == (const Symbol& otherSymbol) const {
 		return this->id == otherSymbol.id;
 	}
+
+	// 输出Symbol
+	friend ostream& operator << (ostream& os, const Symbol& word) {
+		os << word.getId();
+		/*if (word.getType() == Symbol::SymbolType::T) cout << "终结符)";
+		else cout << "非终结符";*/
+		return os;
+	}
 };
 
 // 定义三个特殊符号
@@ -101,7 +109,7 @@ public:
 		return rightSymbol[0];
 	}
 
-	// 返回右侧index后的符号传
+	// 返回右侧index后的符号串
 	vector<Symbol> allSymbolsAfterIndex(int index) const {
 		vector<Symbol> temp;
 		int len = rightSymbol.size();
@@ -110,6 +118,18 @@ public:
 		// 如果index后的符号串为ε
 		if (temp.size() == 0) temp.push_back(EPSILON);
 		return temp;
+	}
+
+	friend ostream& operator << (ostream& os, Item& item) {
+		cout << endl;
+		cout << '[' << item.getLeftSymbol() << " --> ";
+		int len = item.getRightSymbol().size();
+		for (int i = 0; i < len; ++i) {
+			if (i == item.getDotPosition()) cout << "·";
+			cout << item.getRightSymbol()[i] << " ";
+		}
+		cout << "," << item.getForeSymbol() << ']';
+		return os;
 	}
 
 	Symbol getLeftSymbol() const { return leftSymbol; }
@@ -131,16 +151,40 @@ private:
 	int size;
 	vector<Item> items;
 public:
-	ItemSet() {}
+	ItemSet(int id) { 
+		this->id = id; 
+		size = 0;
+		items = vector<Item>();
+	}
+
+	ItemSet(int id, vector<Item>& items) {
+		this->id = id;
+		size = items.size();
+		this->items.assign(items.begin(), items.end());
+	}
 
 	// 往项目集合中加入新项目
-	void joinSet(Item theItem) {
+	void joinItem(Item theItem) {
 		items.push_back(theItem);
 		++size;
 	}
 
+	// 网项目集合中载入items
+	void loadItems(vector<Item>& items) {
+		this->size = items.size();
+		this->items.assign(items.begin(), items.end());
+	}
+
+	// 重载=
+	ItemSet& operator = (ItemSet& otherItemSet) {
+		this->id = otherItemSet.getId();
+		this->size = otherItemSet.getSize();
+		this->items.assign(otherItemSet.getItems().begin(), otherItemSet.getItems().end());
+	}
+
+	// 重载==
 	bool operator == (const ItemSet& otherItemSet) const {
-		if (size != otherItemSet.getId) return false;
+		if (size != otherItemSet.getId()) return false;
 		else {
 			for (int i = 0; i < size; ++i) {
 				if (items[i] == otherItemSet.getItems()[i]) continue;
@@ -150,11 +194,25 @@ public:
 		return true;
 	}
 
+	friend ostream& operator << (ostream& os, ItemSet& itemSet) {
+		cout << "----------------------" << endl;
+		cout << "项目集I" << itemSet.getId() << endl;
+		cout << "大小：" << itemSet.getSize() << endl;
+		vector<Item>& temp = itemSet.getItems();
+		for (int i = 0; i < temp.size(); ++i)
+			cout << temp[i];
+		cout << endl;
+		return os;
+	}
+
 	int getId() const { return id; }
 	int getSize() const { return size; }
 	vector<Item>& getItems() { return items; }
 	const vector<Item>& getItems() const { return items; }
 };
+
+// 定义两个ItemSet, production是产生式，I0是该文法的以ε为活前缀的有效集
+ItemSet productions(-1), I0(0);
 
 // 存储符号X的first()集合
 map<Symbol, set<Symbol>> wordFirstSet;
@@ -163,7 +221,7 @@ map<Symbol, set<Symbol>> wordFirstSet;
 map<Symbol, set<Symbol>> wordFollowSet;
 
 // first(), 求单个符号的可能的第一个终结符
-void first(set<Symbol>& allSymbols, vector<Item>& allItems) {
+void first(set<Symbol>& allSymbols, vector<Item>& productions) {
 	// 对所有终结符来说，它们的first()集合就是它们自己
 	for (auto i = allSymbols.begin(); i != allSymbols.end(); ++i) {
 		set<Symbol> temp;
@@ -174,9 +232,9 @@ void first(set<Symbol>& allSymbols, vector<Item>& allItems) {
 	while (change) {
 		change = false;
 		// 遍历每一个产生式
-		int len = allItems.size();
+		int len = productions.size();
 		for (int i = 0; i < len; ++i) {
-			Item theItem = allItems[i];
+			Item theItem = productions[i];
 			set<Symbol>& temp = wordFirstSet[theItem.getLeftSymbol()];
 			// 产生式的右边第一个符号为终结符
 			Symbol firstRight = theItem.firstSymbolOfRight();
@@ -252,7 +310,7 @@ set<Symbol> first(vector<Symbol> theStr) {
 }
 
 // follow(), 求单个符号的可能的下一个终结符
-void follow(set<Symbol>& allSymbols, vector<Item>& allItems) {
+void follow(set<Symbol>& allSymbols, vector<Item>& productions) {
 	// 初始时，每个非终结符的follow()集合都为空
 	for (auto i = allSymbols.begin(); i != allSymbols.end(); ++i) {
 		if (!isTerminal(*i))
@@ -262,12 +320,12 @@ void follow(set<Symbol>& allSymbols, vector<Item>& allItems) {
 	wordFollowSet[BEGIN].insert(END);
 
 	bool change = true;
-	int len = allItems.size();
+	int len = productions.size();
 	while (change) {
 		change = false;
 		for (int i = 0; i < len; ++i) {
 			// 每个产生式的右侧的符号串
-			vector<Symbol>& theRightSymbol = allItems[i].getRightSymbol();
+			vector<Symbol>& theRightSymbol = productions[i].getRightSymbol();
 			int lenOfRight = theRightSymbol.size();
 			// 遍历产生式右侧的符号串的每个符号，只考虑非终结符
 			for (int j = 0; j < lenOfRight; ++j) {
@@ -276,7 +334,7 @@ void follow(set<Symbol>& allSymbols, vector<Item>& allItems) {
 				else {
 					// 在set中查出当前非终结符已有的follow()集合，并计算出此非终结符后面的符号串的first()集合
 					set<Symbol>& theWordFollow = wordFollowSet[theWord];
-					set<Symbol> joinSet = first(allItems[i].allSymbolsAfterIndex(j));
+					set<Symbol> joinSet = first((productions[i]).allSymbolsAfterIndex(j));
 					// 当joinSet中存在一些theWordFollow集合里面没有的终结符，则将它们加入到theWordFollow集合中去
 					for (auto k = joinSet.begin(); k != joinSet.end(); ++k) {
 						if (theWordFollow.find(*k) == theWordFollow.end() && !((*k) == EPSILON)) {
@@ -287,7 +345,7 @@ void follow(set<Symbol>& allSymbols, vector<Item>& allItems) {
 					// 当joinSet含有为ε（包括当前非终结符后面的字符串的first()集合含有ε或者该字符串本身就为ε）
 					auto findEpsilon = joinSet.find(EPSILON);
 					if (findEpsilon != joinSet.end()) {
-						set<Symbol>& theLeftfollow = wordFollowSet[allItems[i].getLeftSymbol()];
+						set<Symbol>& theLeftfollow = wordFollowSet[productions[i].getLeftSymbol()];
 						for (auto k = theLeftfollow.begin(); k != theLeftfollow.end(); ++k) {
 							if (theWordFollow.find(*k) == theWordFollow.end()) {
 								change = true;
@@ -301,25 +359,90 @@ void follow(set<Symbol>& allSymbols, vector<Item>& allItems) {
 	}
 }
 
-// 求项目集合的闭包
-ItemSet closure(ItemSet theItemSet) {
-
+// 项目是否在项目集中
+bool isInItemSet(vector<Item>& items, Item& theItem) {
+	int len = items.size();
+	for (int i = 0; i < len; ++i) 
+		if (items[i] == theItem) return true;
+	return false;
 }
 
-// 项目集族
+// 求项目集合的闭包
+void closure(ItemSet& theItemSet,const ItemSet& productions) {
+	bool change = true;
+	while (change) {
+		change = false;
+		vector<Item>& allItems = theItemSet.getItems();
+		int len = allItems.size();
+		// 遍历每个项目
+		for (int i = 0; i < len; ++i) {
+			Symbol theWordAfterDot = allItems[i].symbolAfterDot();
+			// dot后面的是一个非终结符
+			if (!isTerminal(theWordAfterDot)) {
+				int dotIndex = allItems[i].getDotPosition();
+				// 此非终结符后面的字符串，以及它的first()集合
+				vector<Symbol> wordsAfter = allItems[i].allSymbolsAfterIndex(dotIndex);
+				// 将前看符号加入
+				wordsAfter.push_back(allItems[i].getForeSymbol());
+				set<Symbol> firstOfWordsAfter = first(wordsAfter);
+				// 遍历每个产生式
+				int lenOfProduction = productions.getSize();
+				for (int j = 0; j < lenOfProduction; ++j) {
+					Item theProduction = productions.getItems()[j];
+					// 产生式中左部非终结符和项目dot后的非终结符相同
+					if (theProduction.getLeftSymbol() == theWordAfterDot) {
+						// 对于每一个b∈FIRST（βa）
+						for (auto k = firstOfWordsAfter.begin(); k != firstOfWordsAfter.end(); ++k) {
+							// 构造一个新的item[B-->·η,b]
+							Item temp(theWordAfterDot, theProduction.getRightSymbol(), (*k), 0);
+							// 当此时的closure中没有这个item，将这个item加入closure
+							if (!isInItemSet(allItems, temp)) {
+								change = true;
+								theItemSet.joinItem(temp);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+
+// go(I, X) = closure(J)
+ItemSet go(ItemSet I, Symbol theSymbol) {
+	vector<Item> temp;
+	vector<Item> items = I.getItems();
+	int num = I.getId() + 1, len = items.size();
+	ItemSet J(num, temp);
+	// 遍历I中的所有项目
+	for (int i = 0; i < len; ++i) {
+		Item theItem = items[i];
+		// 当一个项目的dot后的符号为非终结符符且为theSymbol时
+		Symbol theSymbolAfterDot = theItem.symbolAfterDot();
+		if (theSymbolAfterDot == theSymbol) {
+			Item t(theItem.getLeftSymbol(), theItem.getRightSymbol(),
+				 theItem.getForeSymbol(), theItem.getDotPosition() + 1);
+			J.joinItem(t);
+		}
+	}
+	if (J.getSize() > 0)
+		closure(J, productions);
+	return J;
+}
+
+
+// 项目集族(文法)
 class ItemSetGroup {
 private:
 	vector<ItemSet> itemSets;
 	set<Symbol> allSymbols;
+	vector<Item> production;
 
 public:
 
 };
 
-// go(I, X) = closure(J)
-ItemSet go(ItemSet theItemSet, Symbol theSymbol) {
-
-}
 
 
 void main() {
@@ -334,7 +457,7 @@ void main() {
 	vector<Symbol> t1, t2, t3, t4, t5, t6;
 	t1.push_back(S); 
 	t2.push_back(i); t2.push_back(E); t2.push_back(t); t2.push_back(S); t2.push_back(SS); 
-	t3.push_back(a);
+	t3.push_back(E); t3.push_back(a);
 	t4.push_back(e); t4.push_back(S);
 	t5.push_back(EPSILON);
 	t6.push_back(b);
@@ -363,6 +486,14 @@ void main() {
 		}
 		cout << endl;
 	}
+	vector<Item> tt;
+	tt.push_back(p1);
 
+	ItemSet theSet(0, tt);
+	productions.loadItems(test);
+	closure(theSet, productions);
+	cout << theSet;
 
+	ItemSet test2 = go(theSet, i);
+	cout << test2;
 }
