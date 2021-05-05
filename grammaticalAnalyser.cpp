@@ -6,6 +6,7 @@
 #include<map>
 #include<set>
 #include<queue>
+#include<stack>
 #include<fstream>
 #include<iomanip>
 
@@ -30,7 +31,7 @@ public:
 	};
 private:
 	SymbolType type;
-	int id; 
+	int id;
 public:
 	Symbol() {
 		this->type = SymbolType::T;
@@ -55,7 +56,7 @@ public:
 		return *this;
 	}
 
-	bool operator < (const Symbol& otherSymbol) const{
+	bool operator < (const Symbol& otherSymbol) const {
 		return this->id < otherSymbol.id;
 	}
 
@@ -96,7 +97,7 @@ public:
 		this->dotPosition = dotPosition;
 	}
 
-	bool operator == (const Item& otherItem) const{
+	bool operator == (const Item& otherItem) const {
 		if (this->leftSymbol == otherItem.getLeftSymbol() &&
 			this->foreSymbol == otherItem.getForeSymbol() &&
 			this->dotPosition == otherItem.getDotPosition()) {
@@ -110,7 +111,8 @@ public:
 				}
 			}
 			return true;
-		}else return false;
+		}
+		else return false;
 	}
 
 	// 当dot在最后表示规约项目
@@ -133,7 +135,7 @@ public:
 	vector<Symbol> allSymbolsAfterIndex(int index) const {
 		vector<Symbol> temp;
 		int len = rightSymbol.size();
-		for (int i = index+1; i < len; ++i)
+		for (int i = index + 1; i < len; ++i)
 			temp.push_back(rightSymbol[i]);
 		return temp;
 	}
@@ -154,8 +156,8 @@ public:
 	Symbol getLeftSymbol() const { return leftSymbol; }
 	vector<Symbol>& getRightSymbol() { return rightSymbol; }
 	const vector<Symbol>& getRightSymbol() const { return rightSymbol; }
-	Symbol getForeSymbol() const { return foreSymbol;  }
-	int getDotPosition() const { return dotPosition;  }
+	Symbol getForeSymbol() const { return foreSymbol; }
+	int getDotPosition() const { return dotPosition; }
 };
 
 
@@ -175,7 +177,7 @@ public:
 		this->id = id;
 		this->items.assign(items.begin(), items.end());
 	}
-	
+
 	ItemSet& operator = (ItemSet& otherItemSet) {
 		this->id = otherItemSet.getId();
 		this->items.assign(otherItemSet.getItems().begin(), otherItemSet.getItems().end());
@@ -355,7 +357,7 @@ void first() {
 							temp.insert(*j);
 						}
 					}
-				}	
+				}
 				// 此时表示右边产生式的所有符号皆为非终结符且可以推导出ε
 				if (index == lenOfRight) {
 					temp.insert(EPSILON);
@@ -375,7 +377,7 @@ set<Symbol> first(vector<Symbol> theStr) {
 		next = false;
 		Symbol theWord = theStr[index];
 		// 当前字符为终结符，则将此终结符加入temp
-		
+
 		if (isTerminal(theWord)) {
 			// 空字符直接跳过
 			//if (theWord == EPSILON) {
@@ -512,7 +514,7 @@ ItemSet go(ItemSet& I, Symbol theSymbol) {
 		Symbol theSymbolAfterDot = theItem.symbolAfterDot();
 		if (!theItem.isReductionItem() && theSymbolAfterDot == theSymbol) {
 			Item t(theItem.getLeftSymbol(), theItem.getRightSymbol(),
-				 theItem.getForeSymbol(), theItem.getDotPosition() + 1);
+				theItem.getForeSymbol(), theItem.getDotPosition() + 1);
 			J.joinItem(t);
 		}
 	}
@@ -543,7 +545,7 @@ void DFA(ItemSetGroup& itemSetGroup) {
 			if (temp.getSize() > 0) {
 				int id = isInItemSetGroup(itemSets, temp);
 				// 项目集族中存在该项目集
-				if(id >= 0) { }
+				if (id >= 0) {}
 				// 项目集族中不存在该项目，将该项目集加入
 				else {
 					id = itemSets.size();
@@ -595,7 +597,7 @@ void buildAnalysisTable(ItemSetGroup& itemSetGroup) {
 			}
 		}
 	}
-		
+
 	// 遍历项目集族中的每一个项目集
 	for (int i = 0; i < itemSetSize; ++i) {
 		// 遍历每个项目集中的每个项目
@@ -617,7 +619,7 @@ void buildAnalysisTable(ItemSetGroup& itemSetGroup) {
 					}
 				}
 				// charAfterDot是非终结符
-				else if(!isTerminal(charAfterDot)){
+				else if (!isTerminal(charAfterDot)) {
 					for (auto k = tempTran.begin(); k != tempTran.end(); ++k) {
 						if ((*k).first == charAfterDot) {
 							goTo[i][charAfterDot] = (*k).second;
@@ -675,9 +677,9 @@ void initItemSetGroup(ItemSetGroup& itemSetGroup) {
 	while (!fTranslateTable.eof()) {
 		fTranslateTable >> s1 >> s2 >> s3;
 		num = atoi(s1.c_str());
-		numToStr.insert({ num, s2 });
-		strToNum.insert({ s2, num });
-		if (s3 == "T") allSymbols.insert(Symbol(Symbol::SymbolType::T, num));
+		numToStr.insert({ num, s3 });
+		strToNum.insert({ s3, num });
+		if (s2 == "T") allSymbols.insert(Symbol(Symbol::SymbolType::T, num));
 		else allSymbols.insert(Symbol(Symbol::SymbolType::NT, num));
 	}
 
@@ -693,7 +695,7 @@ void initItemSetGroup(ItemSetGroup& itemSetGroup) {
 		Symbol findSymbol;
 		SplitString(s1, tempVec, " ");
 		for (int i = 0; i < tempVec.size(); ++i) {
-			if (tempVec[i] == "-" || tempVec[i] == ">") continue;
+			if (tempVec[i] == "->") continue;
 			else if (i == 0) {
 				findSymbol = searchSymbol(strToSymId(tempVec[i]));
 				if (!(findSymbol == EPSILON))
@@ -800,7 +802,41 @@ void printTable(ItemSetGroup& itemSetGroup) {
 }
 
 void process() {
-
+	stack<int> stateStk;
+	stateStk.push(0);
+	//stack<Symbol> symbolStk;
+	int ip = 0;
+	int state;
+	Symbol tempSymbol;
+	do {
+		//vector<map<Symbol, pair<int, int>>> action;
+		//vector<map<Symbol, int>> goTo;
+		tempSymbol = testStr[ip];
+		state = stateStk.top();
+		if (action[state][tempSymbol].first == 1) { // 1->S
+			cout << tempSymbol;
+			stateStk.push(action[state][tempSymbol].second);
+			++ip;
+		}
+		else if (action[state][tempSymbol].first == 2) { // 2->R
+			Item& production = productions[action[state][tempSymbol].second];
+			cout << production << endl;
+			for (int i = 0; i < production.getRightSymbol().size(); ++i) {
+				stateStk.pop();
+			}
+			state = stateStk.top();
+			stateStk.push(goTo[state][production.getLeftSymbol()]);
+		}
+		else if (action[state][tempSymbol].first == 3) { // 3->ACK
+			cout << "ACK!\n" << endl;
+			return;
+		}
+		else { // 0->Wrong
+			cout << "Error!\n" << endl;
+			++ip;
+			return;
+		}
+	} while (1);
 }
 
 void main() {
@@ -818,6 +854,6 @@ void main() {
 
 	//vector<map<Symbol, pair<int, int>>> action;
 	//vector<map<Symbol, int>> goTo;
- 	// 打印action和goto表
+	// 打印action和goto表
 
 }
