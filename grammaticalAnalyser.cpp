@@ -271,6 +271,9 @@ map<Symbol, set<Symbol>> wordFollowSet;
 set<Symbol> allSymbols;
 vector<Item> productions;
 
+// 存储测试文件
+vector<Symbol> testStr;
+
 // DFA图
 vector<set<pair<Symbol, int>>> DFARecord;
 
@@ -683,6 +686,19 @@ void initItemSetGroup(ItemSetGroup& itemSetGroup) {
 		else allSymbols.insert(Symbol(Symbol::SymbolType::NT, num));
 	}
 
+	// 载入测试文件
+	ifstream fStr("testStr1.txt", ios::in);
+	if (!fStr.is_open()) {
+		cout << "无法载入测试文件！！" << endl;
+		return;
+	}
+		
+	while (!fStr.eof()) {
+		fStr >> s1;
+		testStr.push_back(searchSymbol(strToSymId(s1)));
+	}
+	testStr.push_back(END); // 在最后加入END
+
 	// 载入文法(产生式)
 	ifstream fGrammer("grammer1.txt", ios::in);
 	if (!fGrammer.is_open())
@@ -814,13 +830,13 @@ void process() {
 		tempSymbol = testStr[ip];
 		state = stateStk.top();
 		if (action[state][tempSymbol].first == 1) { // 1->S
-			cout << tempSymbol;
+			cout <<"移进字符：\t" << tempSymbol << endl;
 			stateStk.push(action[state][tempSymbol].second);
 			++ip;
 		}
 		else if (action[state][tempSymbol].first == 2) { // 2->R
 			Item& production = productions[action[state][tempSymbol].second];
-			cout << production << endl;
+			cout << "规约：\t" << production << endl;
 			for (int i = 0; i < production.getRightSymbol().size(); ++i) {
 				stateStk.pop();
 			}
@@ -851,6 +867,8 @@ void main() {
 	buildAnalysisTable(itemSetGroup);
 
 	printTable(itemSetGroup);
+
+	process();
 
 	//vector<map<Symbol, pair<int, int>>> action;
 	//vector<map<Symbol, int>> goTo;
