@@ -968,9 +968,12 @@ stack<TreeNode> treeStk;
 TreeNode root(BEGIN);
 
 void printTree(TreeNode& node, int num) {
-	int t = num;
-	cout << node.parent << "\t";
+	int t;
+	if (isTerminal(node.parent)) cout << node.parent;
+	else cout << node.parent.getId();
 	for (int i = 0; i < node.childNum; ++i) {
+		t = num;
+		if (i == 0) cout << "\t";
 		if (i != 0) {
 			while (t-- >= 0) {
 				cout << "\t";
@@ -978,7 +981,7 @@ void printTree(TreeNode& node, int num) {
 		}
 		printTree((*(node.child))[i], num+1);
 	}
-	if (node.childNum == 0) cout << endl;
+	if (node.childNum == 0) cout << "\n";
 }
 
 void process() {
@@ -994,8 +997,8 @@ void process() {
 		tempSymbol = testStr[ip];
 		state = stateStk.top();
 		if (action[state][tempSymbol].first == 1) { // 1->S
-			//cout << "移进字符：\t" << tempSymbol << endl;
-			//cout << "去到状态：\t" << action[state][tempSymbol].second << endl;
+			cout << "移进字符：\t" << tempSymbol << endl;
+			cout << "去到状态：\t" << action[state][tempSymbol].second << endl;
 			stateStk.push(action[state][tempSymbol].second);
 			symbolStk.push(tempSymbol);
 			treeStk.push(TreeNode(tempSymbol));
@@ -1003,7 +1006,7 @@ void process() {
 		}
 		else if (action[state][tempSymbol].first == 2) { // 2->R
 			Item& production = productions[action[state][tempSymbol].second];
-			//cout << "规约：\t" << production << endl;
+			cout << "规约：\t" << production << endl;
 			vector<TreeNode> childVec = vector<TreeNode>();
 			for (int i = 0; i < production.getRightSymbol().size(); ++i) {
 				stateStk.pop();
@@ -1012,12 +1015,11 @@ void process() {
 				treeStk.pop();
 			}
 			state = stateStk.top();
-			/*cout << "回退到状态：" << state << endl;
 			cout << "转移到状态:" << goTo[state][production.getLeftSymbol()] << endl;
-			*/
+			
 			TreeNode newNode = TreeNode(production.getLeftSymbol());
 			newNode.joinVec(childVec);
-			cout << "加入新节点:" << production.getLeftSymbol() << endl;
+			//cout << "加入新节点:" << production.getLeftSymbol() << endl;
 
 			treeStk.push(newNode);
 			stateStk.push(goTo[state][production.getLeftSymbol()]);
@@ -1028,7 +1030,7 @@ void process() {
 			if (!treeStk.empty())
 				childVec.push_back(treeStk.top());
 			root.joinVec(childVec);
-			cout << "ACK!\n" << endl;
+			cout << "ACC!\n" << endl;
 
 			printTree(root, 0);
 			return;
@@ -1044,17 +1046,19 @@ void process() {
 			}// 读入空也错，真错
 			else {
 				cout << "Error!\n" << endl;
-				
 				cout << tempSymbol << endl;
 				errorRecord.push_back({ columnNum[ip], tempSymbol });
 				// 首先退出当前状态栈顶元素
+				cout << "退出状态栈：" << stateStk.top() << endl;
 				stateStk.pop();
 				int popState;
 				Symbol popSymbol;
 				while (!symbolStk.empty() && !stateStk.empty() && stateStk.top() != 0) {
 					popState = stateStk.top();
 					popSymbol = symbolStk.top();
-					if (!isTerminal(popSymbol) && goTo[popState][popSymbol] != -1)
+					// 一般回退到的非终结符是表达式、语句、函数或过程等
+					if (!isTerminal(popSymbol) && (popSymbol.getId() != 23) &&
+						goTo[popState][popSymbol] != -1) 
 						break;
 					stateStk.pop();
 					symbolStk.pop();
@@ -1062,13 +1066,16 @@ void process() {
 				}
 				stateStk.push(goTo[popState][popSymbol]);
 				int flag = 1;
+
 				while (ip < testStr.size()) {
 					if (wordFollowSet[popSymbol].find(testStr[ip]) != wordFollowSet[popSymbol].end()) {
 						flag = 0;
 						break;
 					}
+					cout << "丢弃字符" << testStr[ip] << endl;
 					++ip;
 				}
+				if (ip >= testStr.size()) return;
 				if (flag) {
 					cout << "死循环" << endl;
 					return;
