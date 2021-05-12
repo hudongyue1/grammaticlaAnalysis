@@ -1,0 +1,64 @@
+BEGIN -> S
+S -> ExtDefList
+ExtDefList -> ExtDef ExtDefList
+ExtDefList -> EPSILON
+ExtDef -> Specifier ExtDecList ;
+ExtDef -> Specifier ;
+ExtDef -> Specifier FunDec CompSt
+ExtDecList -> VarDec
+ExtDecList -> VarDec , ExtDecList
+Specifier -> TYPE
+TYPE -> int
+TYPE -> float
+TYPE -> bool
+Specifier -> StructSpecifier
+StructSpecifier -> struct OptTag { DefList }
+StructSpecifier -> struct Tag
+OptTag -> id
+OptTag -> EPSILON
+Tag -> id
+VarDec -> id
+VarDec -> VarDec [ int ]
+FunDec -> id ( VarList )
+FunDec -> id ( )
+VarList -> ParamDec , VarList
+VarList -> ParamDec
+ParamDec -> Specifier VarDec
+CompSt -> { DefList StmtList }
+StmtList -> Stmt StmtList
+StmtList -> EPSILON
+Stmt -> Exp ;
+Stmt -> CompSt
+Stmt -> return Exp ;
+Stmt  -> break ;
+Stmt -> if ( Exp ) Stmt
+Stmt -> if ( Exp ) Stmt else Stmt
+Stmt -> while ( Exp ) Stmt
+DefList -> Def DefList
+DefList -> EPSILON
+Def -> Specifier DecList ;
+DecList -> Dec
+DecList -> Dec , DecList
+Dec -> VarDec
+Dec -> VarDec = Exp
+Exp -> Exp = Exp
+Exp -> Exp relop Exp
+Exp -> Exp + Exp
+Exp -> Exp - Exp
+Exp -> Exp * Exp
+Exp -> Exp / Exp
+Exp -> Exp logop Exp
+Exp -> Exp bitop Exp
+Exp -> ( Exp )
+Exp -> - Exp
+Exp -> ! Exp
+Exp -> id ( Args )
+Exp -> id ( )
+Exp -> Exp [ Exp ]
+Exp -> Exp . id
+Exp -> id
+Exp -> num
+Exp -> true
+Exp -> false
+Args -> Exp , Args
+Args -> Exp

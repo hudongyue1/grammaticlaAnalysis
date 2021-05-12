@@ -1,0 +1,14 @@
+0 NT BEGIN
+1 T END
+2 T EPSILON
+3 NT A
+4 NT E
+5 NT T
+6 NT F
+7 T n
+8 T +
+9 T -
+10 T *
+11 T /
+12 T (
+13 T )

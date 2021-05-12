@@ -5,11 +5,24 @@
 #include<algorithm>
 #include<map>
 #include<set>
+#include<queue>
+#include<stack>
 #include<fstream>
 #include<iomanip>
 
 using namespace std;
 
+// 存储翻译表
+map<int, string> numToStr;
+map<string, int> strToNum;
+
+string symIdToStr(int num) {
+	return numToStr[num];
+}
+
+int strToSymId(string str) {
+	return strToNum[str];
+}
 
 class Symbol { // 符号：终结符、非终结符
 public:
@@ -18,8 +31,9 @@ public:
 	};
 private:
 	SymbolType type;
-	int id; 
+	int id;
 public:
+	// 构造函数
 	Symbol() {
 		this->type = SymbolType::T;
 		this->id = 2;
@@ -29,30 +43,35 @@ public:
 		this->id = id;
 	}
 
+	// 获取私有数据
 	SymbolType getType() const {
 		return this->type;
 	}
-
 	int getId() const {
 		return this->id;
 	}
 
-	bool operator < (const Symbol& otherSymbol) const{
+	// 重载操作符
+	Symbol& operator = (const Symbol& otherSymbol) {
+		this->type = otherSymbol.getType();
+		this->id = otherSymbol.getId();
+		return *this;
+	}
+
+	bool operator < (const Symbol& otherSymbol) const {
 		return this->id < otherSymbol.id;
 	}
 
 	bool operator == (const Symbol& otherSymbol) const {
 		return this->id == otherSymbol.id;
 	}
-
 	// 输出Symbol
 	friend ostream& operator << (ostream& os, const Symbol& word) {
-		os << word.getId();
-		/*if (word.getType() == Symbol::SymbolType::T) cout << "终结符)";
-		else cout << "非终结符";*/
+		os << symIdToStr(word.getId());
 		return os;
 	}
 };
+
 
 // 定义三个特殊符号
 const Symbol BEGIN(Symbol::SymbolType::NT, 0); // S'
@@ -68,15 +87,24 @@ private:
 	Symbol foreSymbol; // 向前看符号
 	int dotPosition; // 圆点位置(0 -- rightSymbol.size())
 public:
+	// 构造函数
 	Item() {}
-	Item(Symbol leftSymbol, vector<Symbol> rightSymbol, Symbol foreSymbol = EPSILON, int dotPosition = 0) {
+	Item(Symbol leftSymbol, vector<Symbol> rightSymbol, Symbol foreSymbol = END, int dotPosition = 0) {
 		this->leftSymbol = leftSymbol;
 		this->rightSymbol = rightSymbol;
 		this->foreSymbol = foreSymbol;
 		this->dotPosition = dotPosition;
 	}
 
-	bool operator == (const Item& otherItem) const{
+	// 获取私有数据
+	Symbol getLeftSymbol() const { return leftSymbol; }
+	vector<Symbol>& getRightSymbol() { return rightSymbol; }
+	const vector<Symbol>& getRightSymbol() const { return rightSymbol; }
+	Symbol getForeSymbol() const { return foreSymbol; }
+	int getDotPosition() const { return dotPosition; }
+
+	// 重载操作符
+	bool operator == (const Item& otherItem) const {
 		if (this->leftSymbol == otherItem.getLeftSymbol() &&
 			this->foreSymbol == otherItem.getForeSymbol() &&
 			this->dotPosition == otherItem.getDotPosition()) {
@@ -90,7 +118,21 @@ public:
 				}
 			}
 			return true;
-		}else return false;
+		}
+		else return false;
+	}
+
+	friend ostream& operator << (ostream& os, Item& item) {
+		cout << endl;
+		cout << '[' << item.getLeftSymbol() << " --> ";
+		int len = item.getRightSymbol().size();
+		for (int i = 0; i < len; ++i) {
+			if (i == item.getDotPosition()) cout << "·";
+			cout << item.getRightSymbol()[i] << " ";
+		}
+		if (item.getDotPosition() == len) cout << "· ";
+		cout << "," << item.getForeSymbol() << ']';
+		return os;
 	}
 
 	// 当dot在最后表示规约项目
@@ -100,7 +142,7 @@ public:
 
 	// 返回dot后面的第一个符号
 	Symbol symbolAfterDot() const {
-		if (isReductionItem()) return END;
+		if (isReductionItem()) return EPSILON;
 		else return rightSymbol[dotPosition];
 	}
 
@@ -113,78 +155,47 @@ public:
 	vector<Symbol> allSymbolsAfterIndex(int index) const {
 		vector<Symbol> temp;
 		int len = rightSymbol.size();
-		for (int i = index+1; i < len; ++i)
+		for (int i = index + 1; i < len; ++i)
 			temp.push_back(rightSymbol[i]);
-		// 如果index后的符号串为ε
-		if (temp.size() == 0) temp.push_back(EPSILON);
 		return temp;
 	}
-
-	friend ostream& operator << (ostream& os, Item& item) {
-		cout << endl;
-		cout << '[' << item.getLeftSymbol() << " --> ";
-		int len = item.getRightSymbol().size();
-		for (int i = 0; i < len; ++i) {
-			if (i == item.getDotPosition()) cout << "·";
-			cout << item.getRightSymbol()[i] << " ";
-		}
-		cout << "," << item.getForeSymbol() << ']';
-		return os;
-	}
-
-	Symbol getLeftSymbol() const { return leftSymbol; }
-	vector<Symbol>& getRightSymbol() { return rightSymbol; }
-	const vector<Symbol>& getRightSymbol() const { return rightSymbol; }
-	Symbol getForeSymbol() const { return foreSymbol;  }
-	int getDotPosition() const { return dotPosition;  }
 };
 
-// 判断符号是否为终结符
-bool isTerminal(const Symbol theWord) {
-	return theWord.getType() == Symbol::SymbolType::T;
-}
 
 // 项目集合
 class ItemSet {
 private:
 	int id;
-	int size;
 	vector<Item> items;
 public:
-	ItemSet(int id) { 
-		this->id = id; 
-		size = 0;
+	// 构造函数
+	ItemSet() {}
+	ItemSet(int id) {
+		this->id = id;
 		items = vector<Item>();
 	}
 
 	ItemSet(int id, vector<Item>& items) {
 		this->id = id;
-		size = items.size();
 		this->items.assign(items.begin(), items.end());
 	}
 
-	// 往项目集合中加入新项目
-	void joinItem(Item theItem) {
-		items.push_back(theItem);
-		++size;
-	}
-
-	// 网项目集合中载入items
-	void loadItems(vector<Item>& items) {
-		this->size = items.size();
-		this->items.assign(items.begin(), items.end());
-	}
+	// 获取私有数据
+	int getId() const { return id; }
+	int getSize() const { return this->items.size(); }
+	vector<Item>& getItems() { return items; }
+	const vector<Item>& getItems() const { return items; }
 
 	// 重载=
-	ItemSet& operator = (ItemSet& otherItemSet) {
-		this->id = otherItemSet.getId();
-		this->size = otherItemSet.getSize();
+	ItemSet& operator = (const ItemSet& otherItemSet) {
 		this->items.assign(otherItemSet.getItems().begin(), otherItemSet.getItems().end());
+		return *this;
 	}
 
 	// 重载==
 	bool operator == (const ItemSet& otherItemSet) const {
-		if (size != otherItemSet.getId()) return false;
+		int size = this->getSize();
+		if (size != otherItemSet.getSize()) return false;
 		else {
 			for (int i = 0; i < size; ++i) {
 				if (items[i] == otherItemSet.getItems()[i]) continue;
@@ -205,14 +216,49 @@ public:
 		return os;
 	}
 
-	int getId() const { return id; }
-	int getSize() const { return size; }
-	vector<Item>& getItems() { return items; }
-	const vector<Item>& getItems() const { return items; }
+	// 修改项目集合id
+	void setId(int id) {
+		this->id = id;
+	}
+
+	// 往项目集合中加入新项目
+	void joinItem(Item theItem) {
+		items.push_back(theItem);
+	}
+
+	// 往项目集合中载入items
+	void loadItems(vector<Item>& items) {
+		this->items.assign(items.begin(), items.end());
+	}
 };
 
-// 定义两个ItemSet, production是产生式，I0是该文法的以ε为活前缀的有效集
-ItemSet productions(-1), I0(0);
+// 项目集族(文法)
+class ItemSetGroup {
+private:
+	vector<ItemSet> itemSets;
+
+public:
+	ItemSetGroup() {}
+
+	// 获取私有数据
+	int getItemSetSize() { return itemSets.size(); }
+	vector<ItemSet>& getItemSets() { return itemSets; }
+
+	// 重载操作符
+	friend ostream& operator << (ostream& os, ItemSetGroup& itemSet) {
+		cout << "ItemSetGrop:" << endl;
+		int len = itemSet.getItemSetSize();
+		vector<ItemSet>& temp = itemSet.getItemSets();
+		for (int i = 0; i < len; ++i) {
+			cout << temp[i] << endl;
+		}
+		return os;
+	}
+
+	void loadItemSets(vector<ItemSet>& itemSets) {
+		this->itemSets.assign(itemSets.begin(), itemSets.end());
+	}
+};
 
 // 存储符号X的first()集合
 map<Symbol, set<Symbol>> wordFirstSet;
@@ -220,8 +266,79 @@ map<Symbol, set<Symbol>> wordFirstSet;
 // 存储符号X的follow()集合
 map<Symbol, set<Symbol>> wordFollowSet;
 
+// 所有的符号和产生式
+set<Symbol> allSymbols;
+vector<Item> productions;
+
+// 存储错误信息
+vector<pair<int, Symbol>> errorRecord;
+
+// 存储测试文件
+vector<Symbol> testStr;
+vector<int> columnNum;
+
+// DFA图
+vector<set<pair<Symbol, int>>> DFARecord;
+
+// pair.first表示操作类型0->Wrong 1->S 2->R 3->ACK; 
+// second表示转移状态或者产生式序号
+vector<map<Symbol, pair<int, int>>> action;
+
+// goto
+vector<map<Symbol, int>> goTo;
+
+// 判断符号是否为终结符
+bool isTerminal(const Symbol theWord) {
+	return theWord.getType() == Symbol::SymbolType::T;
+}
+
+// 项目是否在项目集中
+bool isInItemSet(vector<Item>& items, Item& theItem) {
+	int len = items.size();
+	for (int i = 0; i < len; ++i)
+		if (items[i] == theItem) return true;
+	return false;
+}
+
+// 项目集是否在项目集族中
+int isInItemSetGroup(vector<ItemSet>& itemSets, ItemSet& theItemSet) {
+	int len = itemSets.size();
+	for (int i = 0; i < len; ++i) {
+		if (itemSets[i] == theItemSet) {
+			return itemSets[i].getId();
+		}
+	}
+	return -1;
+}
+
+// 根据编号在allSymbols中查找symbol
+Symbol searchSymbol(int id) {
+	set<Symbol>& temp = allSymbols;
+	for (auto i = temp.begin(); i != temp.end(); ++i) {
+		if ((*i).getId() == id) return (*i);
+	}
+	return EPSILON;
+}
+
+// split分隔函数
+void SplitString(const string& s, vector<string>& v, const string& c)
+{
+	string::size_type pos1, pos2;
+	pos2 = s.find(c);
+	pos1 = 0;
+	while (string::npos != pos2)
+	{
+		v.push_back(s.substr(pos1, pos2 - pos1));
+		pos1 = pos2 + c.size();
+		pos2 = s.find(c, pos1);
+	}
+	if (pos1 != s.length())
+		v.push_back(s.substr(pos1));
+}
+
+
 // first(), 求单个符号的可能的第一个终结符
-void first(set<Symbol>& allSymbols, vector<Item>& productions) {
+void first() {
 	// 对所有终结符来说，它们的first()集合就是它们自己
 	for (auto i = allSymbols.begin(); i != allSymbols.end(); ++i) {
 		set<Symbol> temp;
@@ -263,7 +380,7 @@ void first(set<Symbol>& allSymbols, vector<Item>& productions) {
 							temp.insert(*j);
 						}
 					}
-				}	
+				}
 				// 此时表示右边产生式的所有符号皆为非终结符且可以推导出ε
 				if (index == lenOfRight) {
 					temp.insert(EPSILON);
@@ -310,7 +427,7 @@ set<Symbol> first(vector<Symbol> theStr) {
 }
 
 // follow(), 求单个符号的可能的下一个终结符
-void follow(set<Symbol>& allSymbols, vector<Item>& productions) {
+void follow() {
 	// 初始时，每个非终结符的follow()集合都为空
 	for (auto i = allSymbols.begin(); i != allSymbols.end(); ++i) {
 		if (!isTerminal(*i))
@@ -359,16 +476,9 @@ void follow(set<Symbol>& allSymbols, vector<Item>& productions) {
 	}
 }
 
-// 项目是否在项目集中
-bool isInItemSet(vector<Item>& items, Item& theItem) {
-	int len = items.size();
-	for (int i = 0; i < len; ++i) 
-		if (items[i] == theItem) return true;
-	return false;
-}
 
 // 求项目集合的闭包
-void closure(ItemSet& theItemSet,const ItemSet& productions) {
+void closure(ItemSet& theItemSet) {
 	bool change = true;
 	while (change) {
 		change = false;
@@ -386,9 +496,9 @@ void closure(ItemSet& theItemSet,const ItemSet& productions) {
 				wordsAfter.push_back(allItems[i].getForeSymbol());
 				set<Symbol> firstOfWordsAfter = first(wordsAfter);
 				// 遍历每个产生式
-				int lenOfProduction = productions.getSize();
+				int lenOfProduction = productions.size();
 				for (int j = 0; j < lenOfProduction; ++j) {
-					Item theProduction = productions.getItems()[j];
+					Item theProduction = productions[j];
 					// 产生式中左部非终结符和项目dot后的非终结符相同
 					if (theProduction.getLeftSymbol() == theWordAfterDot) {
 						// 对于每一个b∈FIRST（βa）
@@ -408,9 +518,8 @@ void closure(ItemSet& theItemSet,const ItemSet& productions) {
 	}
 }
 
-
 // go(I, X) = closure(J)
-ItemSet go(ItemSet I, Symbol theSymbol) {
+ItemSet go(ItemSet& I, Symbol theSymbol) {
 	vector<Item> temp;
 	vector<Item> items = I.getItems();
 	int num = I.getId() + 1, len = items.size();
@@ -420,80 +529,596 @@ ItemSet go(ItemSet I, Symbol theSymbol) {
 		Item theItem = items[i];
 		// 当一个项目的dot后的符号为非终结符符且为theSymbol时
 		Symbol theSymbolAfterDot = theItem.symbolAfterDot();
-		if (theSymbolAfterDot == theSymbol) {
+		if (!theItem.isReductionItem() && theSymbolAfterDot == theSymbol) {
 			Item t(theItem.getLeftSymbol(), theItem.getRightSymbol(),
-				 theItem.getForeSymbol(), theItem.getDotPosition() + 1);
+				theItem.getForeSymbol(), theItem.getDotPosition() + 1);
 			J.joinItem(t);
 		}
 	}
 	if (J.getSize() > 0)
-		closure(J, productions);
+		closure(J);
 	return J;
 }
 
+// 构造项目集族的DFA，已经在itemSetGroup中载入了allSymbols、productions以及BEGIN->S
+void DFA(ItemSetGroup& itemSetGroup) {
+	ofstream ofTransfer("transfer.txt", ios::out);
+	if (!ofTransfer.is_open()) {
+		cout << "打开Transfer失败" << endl;
+	}
+	ofTransfer.clear();
 
-// 项目集族(文法)
-class ItemSetGroup {
-private:
-	vector<ItemSet> itemSets;
-	set<Symbol> allSymbols;
-	vector<Item> production;
+	// 待扩展队列
+	queue<ItemSet> waitExpansion;
+	// 获取项目集族的各个数据结构
+	vector<ItemSet>& itemSets = itemSetGroup.getItemSets();
+	ItemSet& I0 = itemSets[0];
+	// 对BEGIN->S求closure，得到I0;
+	closure(I0);
+	cout << "closure后:" << endl;
+	cout << I0;
+	// 将I0加入待扩展队列
+	waitExpansion.push(I0);
+	int count = 0;
+	while (!waitExpansion.empty()) {
+		ItemSet& t = waitExpansion.front();
+		set<pair<Symbol, int>> thisTran;
+		for (auto i = allSymbols.begin(); i != allSymbols.end(); ++i) {
+			Symbol theWord = (*i);
+			ItemSet temp = go(t, theWord);
+			if (temp.getSize() > 0) {
+				int id = isInItemSetGroup(itemSets, temp);
+				// 项目集族中存在该项目集
+				if (id >= 0) {}
+				// 项目集族中不存在该项目，将该项目集加入
+				else {
+					id = itemSets.size();
+					temp.setId(id);
+					itemSets.push_back(temp);
+					waitExpansion.push(temp);
+					cout << temp;
+				}
+				thisTran.insert(pair<Symbol, int>(theWord, id));
+			}
+		}
 
-public:
+		ofTransfer << "有效项目集I" << count++ << "的转移:" << endl;
+		for (auto j = thisTran.begin(); j != thisTran.end(); ++j) {
+			ofTransfer << (*j).first << "---" << (*j).second << endl;
+		}
+		ofTransfer << endl;
 
-};
+		DFARecord.push_back(thisTran);
+		waitExpansion.pop();
+	}
+	ofTransfer.close();
+	// 打印DFA
+	//cout << "DFA: " << endl;
+	//for (int i = 0; i < DFARecord.size(); ++i) {
+	//	cout << "有效项目集I" << i << "的转移:" << endl;
+	//	set<pair<Symbol, int>>& temp = DFARecord[i];
+	//	for (auto j = temp.begin(); j != temp.end(); ++j) {
+	//		cout << (*j).first << "---" << (*j).second << endl;
+	//	}
+	//	cout << endl;
+	//}
+}
 
+void buildAnalysisTable(ItemSetGroup& itemSetGroup) {
+	// 获取项目集族的各个数据结构
+	vector<ItemSet>& itemSets = itemSetGroup.getItemSets();
 
+	int itemSetSize = itemSetGroup.getItemSetSize();
 
-void main() {
-	Symbol S(Symbol::SymbolType::NT, 3), E(Symbol::SymbolType::NT, 4), a(Symbol::SymbolType::T, 5),
-		b(Symbol::SymbolType::T, 6), e(Symbol::SymbolType::T, 7), i(Symbol::SymbolType::T, 8),
-		t(Symbol::SymbolType::T, 9), SS(Symbol::SymbolType::NT, 10);
+	// 更改action、goto表大小
+	action.resize(itemSetSize);
+	for (int i = 0; i < itemSetSize; ++i) {
+		for (auto j = allSymbols.begin(); j != allSymbols.end(); ++j) {
+			if (isTerminal(*j)) {
+				action[i][*j].first = 0;
+				action[i][*j].second = -1;
+			}
+		}
+	}
 
-	set<Symbol> allSymbols;
-	allSymbols.insert(SS); allSymbols.insert(S); allSymbols.insert(E); allSymbols.insert(a); allSymbols.insert(b); allSymbols.insert(e); allSymbols.insert(i); allSymbols.insert(t); allSymbols.insert(BEGIN);
-	allSymbols.insert(END); allSymbols.insert(EPSILON);
+	goTo.resize(itemSetSize);
+	for (int i = 0; i < itemSetSize; ++i) {
+		for (auto j = allSymbols.begin(); j != allSymbols.end(); ++j) {
+			if (!isTerminal(*j) && !((*j) == BEGIN)) {
+				goTo[i][*j] = -1;
+			}
+		}
+	}
 
-	vector<Symbol> t1, t2, t3, t4, t5, t6;
-	t1.push_back(S); 
-	t2.push_back(i); t2.push_back(E); t2.push_back(t); t2.push_back(S); t2.push_back(SS); 
-	t3.push_back(E); t3.push_back(a);
-	t4.push_back(e); t4.push_back(S);
-	t5.push_back(EPSILON);
-	t6.push_back(b);
-	Item p1(BEGIN, t1), p2(S, t2), p3(S, t3), p4(SS, t4), p5(SS, t5), p6(E, t6);
+	// 遍历项目集族中的每一个项目集
+	for (int i = 0; i < itemSetSize; ++i) {
+		// 遍历每个项目集中的每个项目
+		vector<Item>& tempItems = itemSets[i].getItems();
+		for (int j = 0; j < tempItems.size(); ++j) {
+			Item& tempItem = tempItems[j];
+			// 非规约项目
+			if (!tempItem.isReductionItem()) {
+				Symbol charAfterDot = tempItem.symbolAfterDot();
+				set<pair<Symbol, int>>& tempTran = DFARecord[i];
+				// charAfterDot是终结符
+				if (isTerminal(charAfterDot)) {
+					for (auto k = tempTran.begin(); k != tempTran.end(); ++k) {
+						if ((*k).first == charAfterDot) {
+							action[i][charAfterDot].first = 1; // 1->S
+							action[i][charAfterDot].second = (*k).second;
+							break;
+						}
+					}
+				}
+				// charAfterDot是非终结符，
+				else if (!isTerminal(charAfterDot)) {
+					for (auto k = tempTran.begin(); k != tempTran.end(); ++k) {
+						if ((*k).first == charAfterDot) {
+							goTo[i][charAfterDot] = (*k).second;
+							break;
+						}
+					}
+				}
+			}
+			// 规约项目
+			else {
+				// 接受项目
+				if (tempItem.getLeftSymbol() == BEGIN && tempItem.getForeSymbol() == END)
+					action[i][END].first = 3; //3->ACK
+				// 规约
+				else {
+					for (int k = 0; k < productions.size(); ++k) {
+						if (productions[k].getLeftSymbol() == tempItem.getLeftSymbol() && productions[k].getRightSymbol() == tempItem.getRightSymbol()) {
+							action[i][tempItem.getForeSymbol()].first = 2; // 2->R
+							action[i][tempItem.getForeSymbol()].second = k;
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+}
 
-	vector<Item> test;
-	test.push_back(p1); test.push_back(p2); test.push_back(p3); test.push_back(p4); test.push_back(p5); test.push_back(p6);
+// 对项目集族进行初始化，包括文法、标识符表的读入等
+void initItemSetGroup(ItemSetGroup& itemSetGroup) {
+	// 载入
+	ifstream fTranslateTable("translateTable.txt", ios::in);
+	string s1, s2, s3;
+	Symbol tempSymbol;
+	int num;
 
-	first(allSymbols, test);
+	// 载入翻译表和符号表
+	if (!fTranslateTable.is_open())
+		cout << "无法载入翻译表！！" << endl;
+	while (!fTranslateTable.eof()) {
+		fTranslateTable >> s1 >> s2 >> s3;
+		num = atoi(s1.c_str());
+		numToStr.insert({ num, s3 });
+		strToNum.insert({ s3, num });
+		if (s2 == "T") allSymbols.insert(Symbol(Symbol::SymbolType::T, num));
+		else allSymbols.insert(Symbol(Symbol::SymbolType::NT, num));
+	}
+	fTranslateTable.close();
+
+	// 载入测试文件
+	ifstream fStr("testStr.txt", ios::in);
+	if (!fStr.is_open()) {
+		cout << "无法载入测试文件！！" << endl;
+		return;
+	}
+
+	while (!fStr.eof()) {
+		fStr >> s1 >> s2;
+		num = atoi(s2.c_str());
+		testStr.push_back(searchSymbol(strToSymId(s1)));
+		columnNum.push_back(num);
+	}
+	fStr.close();
+	testStr.push_back(END); // 在最后加入END
+
+	// 载入文法(产生式)
+	ifstream fGrammer("grammer.txt", ios::in);
+	if (!fGrammer.is_open())
+		cout << "无法载入文法" << endl;
+	// left - right1 right2 right3
+	while (getline(fGrammer, s1)) {
+		vector<string> tempVec;
+		Symbol left;
+		vector<Symbol> right;
+		Symbol findSymbol;
+		SplitString(s1, tempVec, " ");
+		for (int i = 0; i < tempVec.size(); ++i) {
+			if (tempVec[i] == "->") continue;
+			else if (i == 0) {
+				findSymbol = searchSymbol(strToSymId(tempVec[i]));
+				if (!(findSymbol == EPSILON))
+					left = findSymbol;
+			}
+			else {
+				findSymbol = searchSymbol(strToSymId(tempVec[i]));
+				right.push_back(findSymbol);
+			}
+		}
+		Item tempItem(left, right);
+		productions.push_back(tempItem);
+	}
+	fGrammer.close();
+	cout << "allSymbols:" << endl;
+	for (auto i = allSymbols.begin(); i != allSymbols.end(); ++i) {
+		cout << (*i) << endl;
+	}
+	cout << endl;
+
+	cout << "productions:" << endl;
+	for (int i = 0; i < productions.size(); ++i) {
+		cout << productions[i] << endl;
+	}
+	cout << endl;
+
+	first();
+
 	for (auto i = allSymbols.begin(); i != allSymbols.end(); ++i) {
 		set<Symbol> temp = wordFirstSet[*i];
-		cout << "符号" << (*i).getId() << " 的first（）：";
+		cout << "符号" << symIdToStr((*i).getId()) << " 的first（）：";
 		for (auto j = temp.begin(); j != temp.end(); ++j) {
-			cout << (*j).getId() << ' ';
+			cout << symIdToStr((*j).getId()) << ' ';
 		}
 		cout << endl;
 	}
 
 	cout << endl;
-	follow(allSymbols, test);
+	follow();
 	for (auto i = allSymbols.begin(); i != allSymbols.end(); ++i) {
 		set<Symbol> temp = wordFollowSet[*i];
-		cout << "符号" << (*i).getId() << " 的follow（）：";
+		cout << "符号" << symIdToStr((*i).getId()) << " 的follow（）：";
 		for (auto j = temp.begin(); j != temp.end(); ++j) {
-			cout << (*j).getId() << ' ';
+			cout << symIdToStr((*j).getId()) << ' ';
 		}
 		cout << endl;
 	}
+
+	// 构造ItemSetGroup
+	Symbol s = searchSymbol(3);
+	vector<Symbol> sr; sr.push_back(s);
+	Item p1(BEGIN, sr);
 	vector<Item> tt;
 	tt.push_back(p1);
+	ItemSet I0(0, tt);
 
-	ItemSet theSet(0, tt);
-	productions.loadItems(test);
-	closure(theSet, productions);
-	cout << theSet;
+	vector<ItemSet> itemSets;
+	itemSets.push_back(I0);
+	itemSetGroup.loadItemSets(itemSets);
+}
 
-	ItemSet test2 = go(theSet, i);
-	cout << test2;
+// 打印action、goto表
+void printTable() {
+	cout << "action:\t";
+	for (int i = 0; i < action[0].size(); ++i) cout << "\t";
+	cout << " goto:" << endl << "\t";
+	// 先打印非终结符
+	for (auto j = action[0].begin(); j != action[0].end(); ++j) {
+		cout << symIdToStr((*j).first.getId()) << "\t";
+	}
+	cout << "|\t";
+	for (auto j = goTo[0].begin(); j != goTo[0].end(); ++j) {
+		cout << symIdToStr((*j).first.getId()) << "\t";
+	}
+	cout << endl;
+	for (int i = 0; i < action.size(); ++i) {
+		cout << "I" << i << "\t";
+		map<Symbol, pair<int, int>>& tempMap1 = action[i];
+		for (auto j = tempMap1.begin(); j != tempMap1.end(); ++j) {
+			if ((*j).second.first == 1) { // 1->S
+				cout << "S" << (*j).second.second << "\t";
+			}
+			else if ((*j).second.first == 2) { // 2->R
+				cout << "R" << (*j).second.second << "\t";
+			}
+			else if ((*j).second.first == 3) { // 3->ACK
+				cout << "ACK" << "\t";
+			}
+			else { // 0->Wrong
+				cout << "\t";
+			}
+		}
+		cout << "|\t";
+		map<Symbol, int>& tempMap2 = goTo[i];
+		for (auto j = tempMap2.begin(); j != tempMap2.end(); ++j) {
+			if ((*j).second == -1) { // 1->S
+				cout << "\t";
+			}
+			else { // 0->Wrong
+				cout << (*j).second << "\t";
+			}
+		}
+		cout << endl;
+	}
+}
+
+// 存储action、goto表到文件中
+void storeTable() {
+	//vector<map<Symbol, pair<int, int>>> action;
+	//vector<map<Symbol, int>> goTo;
+
+
+	ofstream ofAction("action.txt", ios::out);
+	if (!ofAction.is_open()) {
+		cout << "打开table失败" << endl;
+	}
+	ofAction.clear();
+	ofAction << action.size() << endl;
+	for (int i = 0; i < action.size(); ++i) {
+		map<Symbol, pair<int, int>>& tempMap = action[i];
+		Symbol tempSymbol;
+		for (auto j = tempMap.begin(); j != tempMap.end(); ++j) {
+			tempSymbol = (*j).first;
+			if (tempSymbol.getType() == Symbol::SymbolType::NT) ofAction << "NT\t";
+			else ofAction << "T\t";
+			ofAction << tempSymbol.getId() << "\t" << (*j).second.first << "\t" << (*j).second.second << "\t";
+		}
+		ofAction << "#" << endl;
+	}
+	ofAction.close();
+
+	ofstream ofGoto("goto.txt", ios::out);
+	if (!ofGoto.is_open()) {
+		cout << "打开table失败" << endl;
+	}
+	ofGoto.clear();
+	ofGoto << goTo.size() << endl;
+	for (int i = 0; i < goTo.size(); ++i) {
+		map<Symbol, int>& tempMap = goTo[i];
+		Symbol tempSymbol;
+		for (auto j = tempMap.begin(); j != tempMap.end(); ++j) {
+			tempSymbol = (*j).first;
+			if (tempSymbol.getType() == Symbol::SymbolType::NT) ofGoto << "NT\t";
+			else ofGoto << "T\t";
+			ofGoto << tempSymbol.getId() << "\t" << (*j).second << "\t";
+		}
+		ofGoto << "#" << endl;
+	}
+	ofGoto.close();
+}
+
+// 从文件中读入action、goto表
+void loadTable() {
+	//vector<map<Symbol, pair<int, int>>> action;
+	//vector<map<Symbol, int>> goTo;
+
+	ifstream ifAction("action.txt", ios::in);
+	if (!ifAction.is_open()) {
+		cout << "打开Action table失败" << endl;
+	}
+	string s1, s2, s3, s4;
+	int size;
+	ifAction >> s1;
+	size = atoi(s1.c_str());
+
+	for (int i = 0; i < size; ++i) {
+		map<Symbol, pair<int, int>> tempMap;
+		ifAction >> s1;
+		while (s1 != "#" && !ifAction.eof()) {
+			ifAction >> s2 >> s3 >> s4;
+
+			Symbol tempSymbol(Symbol::SymbolType::T, atoi(s2.c_str()));
+			tempMap.insert({ tempSymbol, pair<int, int>(atoi(s3.c_str()), atoi(s4.c_str())) });
+
+			ifAction >> s1;
+		}
+		action.push_back(tempMap);
+	}
+	ifAction.close();
+
+	ifstream ifGto("goto.txt", ios::in);
+	if (!ifGto.is_open()) {
+		cout << "打开goTo table失败" << endl;
+	}
+	ifGto >> s1;
+	size = atoi(s1.c_str());
+
+	for (int i = 0; i < size; ++i) {
+		map<Symbol, int> tempMap;
+		ifGto >> s1;
+		while (s1 != "#" && !ifGto.eof()) {
+			ifGto >> s2 >> s3;
+
+			Symbol tempSymbol(Symbol::SymbolType::NT, atoi(s2.c_str()));
+			tempMap.insert({ tempSymbol, atoi(s3.c_str()) });
+
+			ifGto >> s1;
+		}
+		goTo.push_back(tempMap);
+	}
+	ifGto.close();
+}
+
+class TreeNode {
+public:
+	Symbol parent;
+	int childNum;
+	vector<TreeNode>* child;
+
+	TreeNode() {
+		this->parent = BEGIN;
+		this->childNum = 0;
+		this->child = new vector<TreeNode>;
+	}
+
+	TreeNode(Symbol symbol) {
+		this->parent = symbol;
+		this->childNum = 0;
+		this->child = new vector<TreeNode>;
+	}
+
+	TreeNode& operator = (TreeNode& otherNode) {
+		this->parent = otherNode.parent;
+		this->childNum = otherNode.childNum;
+		(*(this->child)).assign(otherNode.child->begin(), otherNode.child->end());
+		return *this;
+	}
+	
+	void joinVec(vector<TreeNode>& child) {
+		(*(this->child)).assign(child.begin(), child.end());
+		this->childNum = child.size();
+	}
+};
+
+stack<TreeNode> treeStk;
+TreeNode root(BEGIN);
+
+void printTree(TreeNode& node, int num) {
+	int t;
+	if (isTerminal(node.parent)) cout << node.parent;
+	else cout << node.parent.getId();
+	for (int i = 0; i < node.childNum; ++i) {
+		t = num;
+		if (i == 0) cout << "\t";
+		if (i != 0) {
+			while (t-- >= 0) {
+				cout << "\t";
+			}
+		}
+		printTree((*(node.child))[i], num+1);
+	}
+	if (node.childNum == 0) cout << "\n";
+}
+
+void process() {
+	stack<int> stateStk;
+	stack<Symbol> symbolStk;
+	stateStk.push(0);
+	int ip = 0;
+	int state;
+	Symbol tempSymbol;
+	do {
+		//vector<map<Symbol, pair<int, int>>> action;
+		//vector<map<Symbol, int>> goTo;
+		tempSymbol = testStr[ip];
+		state = stateStk.top();
+		if (action[state][tempSymbol].first == 1) { // 1->S
+			cout << "移进字符：\t" << tempSymbol << endl;
+			cout << "去到状态：\t" << action[state][tempSymbol].second << endl;
+			stateStk.push(action[state][tempSymbol].second);
+			symbolStk.push(tempSymbol);
+			treeStk.push(TreeNode(tempSymbol));
+			++ip;
+		}
+		else if (action[state][tempSymbol].first == 2) { // 2->R
+			Item& production = productions[action[state][tempSymbol].second];
+			cout << "规约：\t" << production << endl;
+			vector<TreeNode> childVec = vector<TreeNode>();
+			for (int i = 0; i < production.getRightSymbol().size(); ++i) {
+				stateStk.pop();
+				symbolStk.pop();
+				childVec.push_back(treeStk.top());
+				treeStk.pop();
+			}
+			state = stateStk.top();
+			cout << "转移到状态:" << goTo[state][production.getLeftSymbol()] << endl;
+			
+			TreeNode newNode = TreeNode(production.getLeftSymbol());
+			newNode.joinVec(childVec);
+			//cout << "加入新节点:" << production.getLeftSymbol() << endl;
+
+			treeStk.push(newNode);
+			stateStk.push(goTo[state][production.getLeftSymbol()]);
+			symbolStk.push(production.getLeftSymbol());
+		}
+		else if (action[state][tempSymbol].first == 3) { // 3->ACK
+			vector<TreeNode> childVec = vector<TreeNode>();
+			if (!treeStk.empty())
+				childVec.push_back(treeStk.top());
+			root.joinVec(childVec);
+			cout << "ACC!\n" << endl;
+
+			printTree(root, 0);
+			return;
+		}
+		else { // 0->Wrong
+			// 读入空的情况，假错
+			if (action[state][EPSILON].first == 1) {
+				cout << "移进字符：\t" << EPSILON << endl;
+				//cout << "去到状态：\t" << action[state][EPSILON].second << endl;
+				stateStk.push(action[state][EPSILON].second);
+				symbolStk.push(EPSILON);
+				treeStk.push(TreeNode(EPSILON));
+			}// 读入空也错，真错
+			else {
+				cout << "Error!\n" << endl;
+				cout << tempSymbol << endl;
+				errorRecord.push_back({ columnNum[ip], tempSymbol });
+				// 首先退出当前状态栈顶元素
+				cout << "退出状态栈：" << stateStk.top() << endl;
+				stateStk.pop();
+				int popState;
+				Symbol popSymbol;
+				while (!symbolStk.empty() && !stateStk.empty() && stateStk.top() != 0) {
+					popState = stateStk.top();
+					popSymbol = symbolStk.top();
+					// 一般回退到的非终结符是表达式、语句、函数或过程等
+					if (!isTerminal(popSymbol) && (popSymbol.getId() != 23) &&
+						goTo[popState][popSymbol] != -1) 
+						break;
+					stateStk.pop();
+					symbolStk.pop();
+					treeStk.pop();
+				}
+				stateStk.push(goTo[popState][popSymbol]);
+				int flag = 1;
+
+				while (ip < testStr.size()) {
+					if (wordFollowSet[popSymbol].find(testStr[ip]) != wordFollowSet[popSymbol].end()) {
+						flag = 0;
+						break;
+					}
+					cout << "丢弃字符" << testStr[ip] << endl;
+					++ip;
+				}
+				if (ip >= testStr.size()) return;
+				if (flag) {
+					cout << "死循环" << endl;
+					return;
+				}
+			}
+		}
+	} while (1);
+}
+void printError() {
+	cout << "错误统计：" << endl;
+	cout << "错误总数：" << errorRecord.size() << endl;
+	cout << "错误行号\t" << "错误符号\t" << endl;
+	for (int i = 0; i < errorRecord.size(); ++i)
+		cout << errorRecord[i].first << "\t" << errorRecord[i].second << endl;
+}
+
+
+void main() {
+	// 有效项目集族
+	ItemSetGroup itemSetGroup;
+	initItemSetGroup(itemSetGroup);
+
+	//DFA(itemSetGroup);
+
+	//cout << itemSetGroup << endl;
+
+	//buildAnalysisTable(itemSetGroup);
+
+	//storeTable();
+	loadTable();
+
+	//printTable();
+
+
+
+	process();
+
+	printError();
+
+	
+
+	//vector<map<Symbol, pair<int, int>>> action;
+	//vector<map<Symbol, int>> goTo;
+	// 打印action和goto表
+
 }
